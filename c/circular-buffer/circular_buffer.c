@@ -2,21 +2,28 @@
 #include <stdlib.h>
 #include <errno.h>
 
-
-circular_buffer_t *new_circular_buffer(uint16_t capacity)
+struct circular_buffer_s
 {
-    buffer_value_t *elements =
-        (buffer_value_t *)malloc(capacity * sizeof(buffer_value_t));
-    circular_buffer_t *buffer =
-        (circular_buffer_t *)malloc(sizeof(circular_buffer_t));
+    size_t capacity;
+    size_t read_from_idx;
+    size_t write_to_idx;
+    size_t filled_slots;
+    buffer_value_t elements[];
+};
 
-    if (!(elements && buffer))
+static void move_to_next_idx(size_t *idx, size_t capacity);
+
+circular_buffer_t *new_circular_buffer(size_t capacity)
+{
+    circular_buffer_t *buffer = malloc(
+        sizeof(circular_buffer_t) + capacity * sizeof(buffer_value_t));
+
+    if (!buffer)
     {
         return NULL;
     }
 
     buffer->capacity = capacity;
-    buffer->elements = elements;
 
     clear_buffer(buffer);
 
@@ -26,7 +33,6 @@ circular_buffer_t *new_circular_buffer(uint16_t capacity)
 
 void delete_buffer(circular_buffer_t *buffer)
 {
-    free(buffer->elements);
     free(buffer);
 }
 
@@ -39,7 +45,7 @@ void clear_buffer(circular_buffer_t *buffer)
 }
 
 
-int16_t read(circular_buffer_t *buffer, buffer_value_t *read_value)
+size_t read(circular_buffer_t *buffer, buffer_value_t *read_value)
 {
     if (!buffer || !read_value || buffer->filled_slots == 0)
     {
@@ -48,15 +54,21 @@ int16_t read(circular_buffer_t *buffer, buffer_value_t *read_value)
     }
 
     *read_value = buffer->elements[buffer->read_from_idx];
-    buffer->read_from_idx = (buffer->read_from_idx + 1) % buffer->capacity;
+    move_to_next_idx(&buffer->read_from_idx, buffer->capacity);
     buffer->filled_slots--;
 
     return EXIT_SUCCESS;
 }
 
 
-int16_t write(circular_buffer_t *buffer, buffer_value_t write_value)
+size_t write(circular_buffer_t *buffer, buffer_value_t write_value)
 {
+    if (!buffer)
+    {
+        errno = ENODATA;
+        return EXIT_FAILURE;
+    }
+
     if (buffer->filled_slots == buffer->capacity)
     {
         errno = ENOBUFS;
@@ -67,10 +79,16 @@ int16_t write(circular_buffer_t *buffer, buffer_value_t write_value)
 }
 
 
-int16_t overwrite(circular_buffer_t *buffer, buffer_value_t write_value)
+size_t overwrite(circular_buffer_t *buffer, buffer_value_t write_value)
 {
+    if (!buffer)
+    {
+        errno = ENODATA;
+        return EXIT_FAILURE;
+    }
+
     buffer->elements[buffer->write_to_idx] = write_value;
-    buffer->write_to_idx = (buffer->write_to_idx + 1) % buffer->capacity;
+    move_to_next_idx(&buffer->write_to_idx, buffer->capacity);
 
     if (buffer->filled_slots < buffer->capacity)
     {
@@ -82,4 +100,10 @@ int16_t overwrite(circular_buffer_t *buffer, buffer_value_t write_value)
     }
 
     return EXIT_SUCCESS;
+}
+
+
+void move_to_next_idx(size_t *idx, size_t capacity)
+{
+    *idx = (*idx + 1) % capacity;
 }
