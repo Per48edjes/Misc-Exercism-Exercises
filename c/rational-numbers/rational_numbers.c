@@ -1,45 +1,38 @@
 #include "rational_numbers.h"
 #include <math.h>
 
-#define MAX(A, B) ((A) > (B) ? (A) : (B))
+typedef rational_t binary_func(rational_t r1, rational_t r2);
+typedef binary_func *BinaryFunction;
 
 static const rational_t one = {1, 1};
 
-static int16_t gcd(int16_t a, int16_t b);
-static rational_t negate(rational_t r);
-static rational_t mult_inverse(rational_t r);
-static rational_t repeater(rational_t ( *func )(
-                               rational_t r1,
-                               rational_t r2),
-                           rational_t    r,
-                           int16_t       n);
+
+static inline int max(int a, int b)
+{
+    return ((a) > (b) ? (a) : (b));
+}
 
 static int16_t gcd(int16_t a, int16_t b)
 {
     if (a == 0 || b == 0)
     {
-        return MAX(a, b);
+        return max(a, b);
     }
     return a > b ? gcd(b, a % b) : gcd(a, b % a);
 }
 
 static rational_t negate(rational_t r)
 {
-    rational_t s = { -1 * r.numerator, r.denominator };
-    return reduce(s);
+    return reduce((rational_t){ -1 * r.numerator, r.denominator });
 }
 
 static rational_t mult_inverse(rational_t r)
 {
-    rational_t s = { r.denominator, r.numerator };
-    return reduce(s);
+    return reduce((rational_t){ r.denominator, r.numerator });
 }
 
-static rational_t repeater(rational_t ( *func )(
-                               rational_t r1,
-                               rational_t r2),
-                           rational_t    r,
-                           int16_t       n)
+static rational_t repeater(
+    BinaryFunction func, rational_t r, int16_t n)
 {
     if (n == 1)
     {
@@ -62,18 +55,14 @@ rational_t reduce(rational_t r)
 
 rational_t absolute(rational_t r)
 {
-    rational_t s = { abs(r.numerator), abs(r.denominator) };
-    return reduce(s);
+    return reduce((rational_t){ abs(r.numerator), abs(r.denominator) });
 }
 
 rational_t add(rational_t r1, rational_t r2)
 {
-    rational_t r =
-    {
-        (r1.numerator * r2.denominator) + (r2.numerator * r1.denominator),
-        (r1.denominator * r2.denominator)
-    };
-    return reduce(r);
+    return reduce((rational_t) { (r1.numerator * r2.denominator) +
+                                 (r2.numerator * r1.denominator),
+                                 (r1.denominator * r2.denominator) });
 }
 
 rational_t subtract(rational_t r1, rational_t r2)
@@ -83,11 +72,8 @@ rational_t subtract(rational_t r1, rational_t r2)
 
 rational_t multiply(rational_t r1, rational_t r2)
 {
-    rational_t r =
-    {
-        r1.numerator * r2.numerator, r1.denominator * r2.denominator
-    };
-    return reduce(r);
+    return reduce((rational_t){ r1.numerator *r2.numerator,
+                                r1.denominator *r2.denominator });
 }
 
 rational_t divide(rational_t r1, rational_t r2)
@@ -111,5 +97,5 @@ float exp_real(uint16_t x, rational_t r)
     {
         return 1.0;
     }
-    return pow(pow(x, r.numerator), 1.0 / r.denominator);
+    return powf(x, (float)r.numerator / r.denominator);
 }

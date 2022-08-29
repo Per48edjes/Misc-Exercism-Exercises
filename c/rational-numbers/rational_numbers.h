@@ -2,6 +2,7 @@
 #define RATIONAL_NUMBERS_H
 
 #include <stdlib.h>
+#include <stdint.h>
 
 typedef struct
 {
