@@ -11,6 +11,6 @@ typedef struct {
 } resistor_value_t;
 
 
-resistor_value_t color_code(resistor_band_t bands[]);
+resistor_value_t color_code(resistor_band_t bands[static 3]);
 
 #endif

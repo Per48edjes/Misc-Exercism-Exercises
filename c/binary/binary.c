@@ -1,18 +1,16 @@
 #include "binary.h"
-#include <string.h>
-#include <math.h>
 
 
 int convert(const char *input)
 {
     int base_10_repr = 0;
-    for (int i = strlen(input) - 1, k = 0; i >= 0 ; i--, k++)
+    while (*input)
     {
-        if (!(input[i] == '0' || input[i] == '1') )
+        if (!(*input == '0' || *input == '1'))
         {
             return INVALID;
         }
-        base_10_repr += (input[i] == '1' ? 1 : 0) * (int)pow(2, k);
+        base_10_repr = (base_10_repr << 1) + (*(input++) == '1');
     }
     return base_10_repr;
 }
