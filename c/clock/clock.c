@@ -1,8 +1,9 @@
 #include "clock.h"
-#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <math.h>
+
+#define MINUTES_PER_HOUR 60
+#define HOURS_PER_DAY 24 
 
 typedef struct
 {
@@ -29,9 +30,9 @@ clock_t clock_create(int hour, int minute)
     clock_t clock;
 
     /* Handle rollover */
-    hour += (int)floor((float)minute / 60);
-    hour = pmod(hour, 24);
-    minute = pmod(minute, 60);
+    int total_minutes = minute + (MINUTES_PER_HOUR * hour);
+    hour = pmod(total_minutes, MINUTES_PER_HOUR * HOURS_PER_DAY) / MINUTES_PER_HOUR;
+    minute = pmod(minute, MINUTES_PER_HOUR);
 
     /* Assemble string representation */
     sprintf(clock.text, "%02d:%02d", hour, minute);
