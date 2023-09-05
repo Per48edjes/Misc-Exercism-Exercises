@@ -27,6 +27,8 @@ static size_t decimal_int_to_str(size_t n, char* position)
     return count;
 }
 
+//CALLBACKS <3
+
 static void encoded_length_callback(void* env, size_t count, char letter)
 {
     (void)letter;
@@ -45,6 +47,23 @@ static void encoded_writer_callback(void* env, size_t count, char letter)
     **writer_head = letter;
     (*writer_head)++;
 }
+
+static void decoded_length_callback(void* env, size_t count, char letter) {
+    
+    (void)letter;
+    size_t* decompressed_length = env;
+    *decompressed_length += count;
+}
+
+static void decoded_writer_callback(void* env, size_t count, char letter)
+{
+    char** writer_head = env;
+    for(char* bound = *writer_head + count;*writer_head < bound; (*writer_head)++) {
+        **writer_head = letter;
+    }
+}
+
+//VISITORS <3
 
 static void decoded_run_length_visitor(const char* text, void* env,
                                void (*callback)(void* env, size_t count,
@@ -69,45 +88,6 @@ static void decoded_run_length_visitor(const char* text, void* env,
     callback(env, count, last_seen);
 }
 
-char* encode(const char* text)
-{
-    if (text == NULL)
-    {
-        exit(EXIT_FAILURE);
-    }
-    char* encoded_text;
-    if (text[0] == '\0')
-    {
-        encoded_text = calloc(1, sizeof(char));
-    }
-    else
-    {
-        size_t compressed_length = 0;
-        decoded_run_length_visitor(text, &compressed_length,
-                           encoded_length_callback);
-        encoded_text = calloc((1 + compressed_length), sizeof(char));
-        char* writer_head = encoded_text;
-        decoded_run_length_visitor(text, &writer_head, encoded_writer_callback);
-    }
-    return encoded_text;
-}
-
-
-static void decoded_length_callback(void* env, size_t count, char letter) {
-    
-    (void)letter;
-    size_t* decompressed_length = env;
-    *decompressed_length += count;
-}
-
-static void decoded_writer_callback(void* env, size_t count, char letter)
-{
-    char** writer_head = env;
-    for(char* bound = *writer_head + count;*writer_head < bound; (*writer_head)++) {
-        **writer_head = letter;
-    }
-}
-
 static void encoded_run_length_visitor(
     const char* encoded_text, void* env,
     void (*callback)(void* env, size_t count,char letter)
@@ -127,24 +107,50 @@ static void encoded_run_length_visitor(
     }
 }
 
-char* decode(const char* encoded_text) {
-    if (encoded_text == NULL)
+//THE COMPRESSION STUFF <3
+
+char* encode_or_decode(
+    const char* input_text,
+    void (*visitor)(const char*, void*, void(*callback)(void*, size_t, char)),
+    void (*length_callback)(void*, size_t, char),
+    void (*writer_callback)(void*, size_t, char)
+    )
+{
+    if (input_text == NULL)
     {
         exit(EXIT_FAILURE);
     }
-    char* decoded_text;
-    if (encoded_text[0] == '\0')
+    char* output_text;
+    if (input_text[0] == '\0')
     {
-        decoded_text = calloc(1, sizeof(char));
+        output_text = calloc(1, sizeof(char));
     }
     else
     {
-       size_t decompressed_length = 0;
-        encoded_run_length_visitor(encoded_text, &decompressed_length,
-                           decoded_length_callback);
-        decoded_text = calloc((1 + decompressed_length), sizeof(char));
-        char* writer_head = decoded_text;
-        encoded_run_length_visitor(encoded_text, &writer_head, decoded_writer_callback);
+        size_t length = 0;
+        visitor(input_text, &length,
+                           length_callback);
+        output_text = calloc((1 + length), sizeof(char));
+        char* writer_head = output_text;
+        visitor(input_text, &writer_head, writer_callback);
     }
-    return decoded_text;
+    return output_text;
+}
+
+char* encode(const char* text) {
+    return encode_or_decode(
+        text,
+        decoded_run_length_visitor,
+        encoded_length_callback,
+        encoded_writer_callback
+    );
+}
+
+char* decode(const char* text) {
+    return encode_or_decode(
+        text,
+        encoded_run_length_visitor,
+        decoded_length_callback,
+        decoded_writer_callback
+    );
 }
