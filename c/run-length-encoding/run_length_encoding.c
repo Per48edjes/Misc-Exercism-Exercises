@@ -1,4 +1,5 @@
 #include "run_length_encoding.h"
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -26,14 +27,16 @@ static size_t decimal_int_to_str(size_t n, char* position)
     return count;
 }
 
-static void compressed_length_callback(void* env, size_t count, char letter)
+// CALLBACKS <3
+
+static void encoded_length_callback(void* env, size_t count, char letter)
 {
     (void)letter;
     size_t* compressed_length = env;
     *compressed_length += count == 1 ? 1 : (decimal_int_to_strlen(count) + 1);
 }
 
-static void writer_callback(void* env, size_t count, char letter)
+static void encoded_writer_callback(void* env, size_t count, char letter)
 {
     char** writer_head = env;
     if (count > 1)
@@ -45,9 +48,29 @@ static void writer_callback(void* env, size_t count, char letter)
     (*writer_head)++;
 }
 
-static void run_length_visitor(const char* text, void* env,
-                               void (*callback)(void* env, size_t count,
-                                                char letter))
+static void decoded_length_callback(void* env, size_t count, char letter)
+{
+
+    (void)letter;
+    size_t* decompressed_length = env;
+    *decompressed_length += count;
+}
+
+static void decoded_writer_callback(void* env, size_t count, char letter)
+{
+    char** writer_head = env;
+    for (char* bound = *writer_head + count; *writer_head < bound;
+         (*writer_head)++)
+    {
+        **writer_head = letter;
+    }
+}
+
+// VISITORS <3
+
+static void decoded_run_length_visitor(const char* text, void* env,
+                                       void (*callback)(void* env, size_t count,
+                                                        char letter))
 {
     char last_seen = text[0];
     size_t count = 1;
@@ -68,27 +91,62 @@ static void run_length_visitor(const char* text, void* env,
     callback(env, count, last_seen);
 }
 
-char* encode(const char* text)
+static void encoded_run_length_visitor(const char* encoded_text, void* env,
+                                       void (*callback)(void* env, size_t count,
+                                                        char letter))
 {
-    if (text == NULL)
+    size_t count = 0;
+    for (const char* ptr = encoded_text; *ptr; ptr++)
+    {
+        char letter = *ptr;
+        if (isdigit(letter))
+        {
+            count = count * 10 + (letter - '0');
+        }
+        else
+        {
+            callback(env, count != 0 ? count : 1, letter);
+            count = 0;
+        }
+    }
+}
+
+// THE COMPRESSION STUFF <3
+
+static char* encode_or_decode(
+    const char* input_text,
+    void (*visitor)(const char*, void*, void (*callback)(void*, size_t, char)),
+    void (*length_callback)(void*, size_t, char),
+    void (*writer_callback)(void*, size_t, char))
+{
+    if (input_text == NULL)
     {
         exit(EXIT_FAILURE);
     }
-    char* encoded_text;
-    if (text[0] == '\0')
+    char* output_text;
+    if (input_text[0] == '\0')
     {
-        encoded_text = calloc(1, sizeof(char));
+        output_text = calloc(1, sizeof(char));
     }
     else
     {
-        size_t compressed_length = 0;
-        run_length_visitor(text, &compressed_length,
-                           compressed_length_callback);
-        encoded_text = calloc((1 + compressed_length), sizeof(char));
-        char* writer_head = encoded_text;
-        run_length_visitor(text, &writer_head, writer_callback);
+        size_t length = 0;
+        visitor(input_text, &length, length_callback);
+        output_text = calloc((1 + length), sizeof(char));
+        char* writer_head = output_text;
+        visitor(input_text, &writer_head, writer_callback);
     }
-    return encoded_text;
+    return output_text;
 }
 
-char* decode(const char* data);
+char* encode(const char* text)
+{
+    return encode_or_decode(text, decoded_run_length_visitor,
+                            encoded_length_callback, encoded_writer_callback);
+}
+
+char* decode(const char* text)
+{
+    return encode_or_decode(text, encoded_run_length_visitor,
+                            decoded_length_callback, decoded_writer_callback);
+}
